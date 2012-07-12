@@ -37,11 +37,17 @@
 		
 		initialize: function () {
 			this.collection = new Directory(contacts);
+			this.$el.find("#filter").append(this.createSelect());
+			this.on("change:filterType", this.filterByType, this);
+			this.collection.on("reset", this.render, this);
 			this.render();
 		},
 		
 		render: function () {
 			var that = this;
+			
+			this.$el.find("article").remove();
+			
 			_.each(this.collection.models, function (item) {
 				that.renderContact(item);
 			}, this);
@@ -52,9 +58,70 @@
 				model: item
 			});
 			this.$el.append(contactView.render().el);
+		},
+		
+		getTypes: function () {
+			return _.uniq(this.collection.pluck("type"), false, function (item) {
+				return item.toLowerCase();
+			});
+		},
+		
+		createSelect: function (){
+			var filter = this.$el.find("#filter"),
+				select = $("<select/>", {
+					html: "<option>All</option>"
+				});
+			_.each(this.getTypes(), function (item) {
+				var option = $("<option/>", {
+					value: item.toLowerCase(),
+					text: item.toLowerCase()
+				}).appendTo(select);
+			});
+			
+			return select;
+		},
+		
+		events: {
+			"change #filter select:": "setFilter"
+		},
+		
+		setFilter: function (e) {
+			this.filterType = e.currentTarget.value;
+			this.trigger("change:filterType");
+		},
+		
+		filterByType: function () {
+			if (this.filterType === "All") {
+				this.collection.reset(contacts);
+			}
+			else {
+				this.collection.reset(contacts,  { silent: true });			 	
+				var filterType = this.filterType
+					filtered = _.filter(this.collection.models, function (item) {
+					return item.get("type").toLowerCase() === filterType;
+				});
+				
+				this.collection.reset(filtered);
+				contactsRouter.navigate("filter/" + filterType);
+			}
+		}
+	});
+	
+	var ContactsRouter = Backbone.Router.extend({
+		routes: {
+			"filter/:type": "urlFilter"
+		},
+		
+		urlFilter: function (type) {
+			directory.filterTYpe = type;
+			directory.trigger("change:filterType");
 		}
 	});
 	
 	var directory = new DirectoryView();
+	
+	var contactsRouter = new ContactsRouter();
+	
+	Backbone.history.start();
 	
 } (jQuery));
